@@ -2,7 +2,7 @@
 
 ## Scope and security objectives
 
-The demo aims to teach four properties: record content is not written directly to the ledger; a stored encrypted blob can be checked against a ledger commitment; a recipient without an active patient grant is denied by the API; and accepted grants, revocations, and accesses create inspectable EVM events. The system assumes all values are synthetic and runs on one local computer.
+The demo aims to teach four properties: record content is not written directly to the ledger; a stored encrypted blob can be checked against a ledger commitment; a grantee without an active patient grant is denied by the API (the patient always has access); and grants, revocations, and caller-reported accesses create inspectable EVM events. The system assumes all values are synthetic and runs on one local computer.
 
 ## Assets and trust boundaries
 
@@ -12,21 +12,21 @@ Assets include record plaintext before and after decryption, the AES key and pse
 
 | Threat | Prototype control | Residual risk |
 |---|---|---|
-| Unauthorized demo role reads a record before consent | API checks the contract's active access mapping before decrypting/returning | Caller can claim any role using `x-demo-actor`; API is not exposed safely to untrusted users |
+| Unauthorized grantee reads a record before consent or after expiry | API checks patient ownership or the contract's unexpired grant before decrypting/returning | When explicitly enabled, a caller can claim any role using `x-demo-actor`; the CLI only binds to loopback, but the role header is not authentication |
 | Consent remains open indefinitely | Grants have an explicit expiry capped at 30 days; patient can revoke | A leaked key/address or backend compromise can impersonate identities; expiration cannot revoke plaintext already copied |
 | Ciphertext is altered | AES-GCM rejects modified ciphertext/authentication tags; envelope hash is compared with the ledger | A compromised host/master key can read or replace local records; no independent storage integrity service exists |
 | Plaintext is substituted while retaining a blob | Salted canonical-bundle hash must match the ledger commitment after decryption | API controls verification and key; independent recipients need a trusted verifier/client and the salt/payload |
 | Observer guesses patient alias from public hash | A keyed HMAC produces the on-chain pseudonym | Identifier is stable/linkable; key compromise enables mapping; timing, addresses, and access patterns still leak |
-| Ledger exposes medical data | Only IDs, addresses, hashes, expiries, and events are recorded | Hashes and metadata may still leak facts or enable correlation; immutable events cannot be erased |
+| Ledger exposes medical data | Record text is omitted; record/pseudonymous IDs, patient/grantee/actor addresses, hashes, expiries, and events remain public | Metadata may leak facts or enable correlation; immutable events cannot be erased |
 | Malicious insurer/clinician keeps a copy | Nothing | Access control cannot enforce behavior after plaintext disclosure |
 | False, poisoned, or clinically wrong input | None; schema requires `synthetic: true` as a teaching guardrail | Ledger proves a commitment was recorded, not that data is true or medically valid |
 | Network/economic/consensus attack | Not modeled; local single-node chain | No decentralization, consortium governance, fault tolerance, finality, or realistic adversarial network |
-| API abuse or denial of service | JSON body limit and narrow routes | No robust rate limits, monitoring, TLS, WAF, audit alerting, backups, or incident response |
+| API abuse or denial of service | Role routes require explicit local-demo opt-in; the CLI refuses non-loopback binding; JSON body size is limited | No real authentication, TLS, robust rate limits, monitoring, WAF, audit alerting, backups, or incident response; audit requests rescan local event history |
 
 ## Assumptions
 
 - Test signers, the master secret, Node process, dependencies, and local machine are trusted for the duration of a demo.
-- Role headers are chosen by a trusted demonstrator, not by an internet client.
+- Demo role headers are enabled only for a trusted local demonstrator; they are not suitable for untrusted callers.
 - The record sample values are fabricated. The `synthetic: true` flag does not validate provenance.
 - The embedded chain's state is intentionally disposable and does not model a permissioned production network.
 

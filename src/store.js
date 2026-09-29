@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export class EncryptedBlobStore {
@@ -25,5 +25,9 @@ export class EncryptedBlobStore {
   async get(recordId) {
     const raw = await readFile(this.fileFor(recordId), 'utf8');
     return JSON.parse(raw);
+  }
+
+  async delete(recordId) {
+    await rm(this.fileFor(recordId), { force: true });
   }
 }

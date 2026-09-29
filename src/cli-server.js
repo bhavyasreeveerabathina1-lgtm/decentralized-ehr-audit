@@ -7,15 +7,22 @@ import { deriveKey } from './crypto.js';
 import { EncryptedBlobStore } from './store.js';
 import { createSystem } from './system.js';
 
+if (process.env.EHR_ENABLE_DEMO_AUTH !== 'true') {
+  throw new Error('Refusing to start: set EHR_ENABLE_DEMO_AUTH=true only for a local educational demo; role headers are not authentication.');
+}
+const host = process.env.HOST || '127.0.0.1';
+if (!['127.0.0.1', '::1', 'localhost'].includes(host)) {
+  throw new Error('Refusing to bind the demo API beyond loopback; this prototype has no real authentication or TLS.');
+}
+const key = deriveKey();
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ephemeralStoreDir = process.env.EHR_STORE_DIR ? null : await mkdtemp(path.join(os.tmpdir(), 'ehr-audit-'));
 const storeDir = process.env.EHR_STORE_DIR || ephemeralStoreDir || path.join(root, 'data', 'encrypted-records');
 const store = new EncryptedBlobStore(storeDir);
 await store.initialize();
 const system = await createSystem();
-const app = createApp({ ...system, store, key: deriveKey() });
+const app = createApp({ ...system, store, key, demoAuthEnabled: true });
 const port = Number(process.env.PORT || 3000);
-const host = process.env.HOST || '127.0.0.1';
 const server = app.listen(port, host, async () => {
   const address = server.address();
   console.log(`EHR audit prototype listening at http://${host}:${address.port}`);

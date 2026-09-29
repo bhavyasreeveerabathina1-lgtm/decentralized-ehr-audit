@@ -31,13 +31,23 @@ function validatePayload(body) {
   return { patientRef: body.patientRef, payload: { ...payload } };
 }
 
-async function parseRecord(contract, recordId) {
-  const result = await contract.getRecord(recordId);
-  return { patient: result[0], patientId: result[1], dataHash: result[2], encryptedBlobHash: result[3] };
+function isUnknownRecordError(error) {
+  return [error?.reason, error?.shortMessage, error?.message, error?.info?.error?.message, error?.error?.message]
+    .some((message) => typeof message === 'string' && /unknown record/i.test(message));
 }
 
-async function verifyStoredRecord({ contract, store, recordId, key }) {
-  const onChain = await parseRecord(contract, recordId);
+async function parseRecord(contract, recordId) {
+  try {
+    const result = await contract.getRecord(recordId);
+    return { patient: result[0], patientId: result[1], dataHash: result[2], encryptedBlobHash: result[3] };
+  } catch (error) {
+    if (isUnknownRecordError(error)) throw new HttpError(404, 'record not found');
+    throw error;
+  }
+}
+
+async function verifyStoredRecord({ contract, store, recordId, key, onChain: knownRecord }) {
+  const onChain = knownRecord || await parseRecord(contract, recordId);
   const envelope = await store.get(recordId);
   if (envelopeHash(envelope).toLowerCase() !== onChain.encryptedBlobHash.toLowerCase()) throw new HttpError(409, 'encrypted blob integrity check failed');
   let bundle;
@@ -47,19 +57,16 @@ async function verifyStoredRecord({ contract, store, recordId, key }) {
   return { onChain, bundle, payload: bundle.payload };
 }
 
-export function createApp({ contract, signers, store, key = deriveKey(), patientIdKey = deriveKey(undefined, 'patient-pseudonym-v1') }) {
+export function createApp({ contract, signers, store, key = deriveKey(), patientIdKey = deriveKey(undefined, 'patient-pseudonym-v1'), demoAuthEnabled = false }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '16kb', strict: true }));
 
-  const accountAddresses = {};
   const signerByRole = {};
-  for (let i = 0; i < ROLES.length; i += 1) {
-    signerByRole[ROLES[i]] = signers[i];
-    accountAddresses[ROLES[i]] = null;
-  }
+  for (let i = 0; i < ROLES.length; i += 1) signerByRole[ROLES[i]] = signers[i];
 
   const withActor = async (req, _res, next) => {
+    if (!demoAuthEnabled) return next(new HttpError(503, 'demo role API is disabled; explicitly enable it only for a local educational demo'));
     const role = req.get('x-demo-actor');
     if (!ROLES.includes(role)) return next(new HttpError(401, 'set x-demo-actor to patient, doctor, or insurer (demo identities only)'));
     req.actorRole = role;
@@ -70,6 +77,7 @@ export function createApp({ contract, signers, store, key = deriveKey(), patient
 
   app.get('/health', (_req, res) => res.json({ status: 'ok', mode: 'educational-demo', chain: 'local-hardhat-evm' }));
   app.get('/api/demo/accounts', async (_req, res, next) => {
+    if (!demoAuthEnabled) return next(new HttpError(503, 'demo role API is disabled; explicitly enable it only for a local educational demo'));
     try {
       const accounts = {};
       for (const role of ROLES) accounts[role] = await signerByRole[role].getAddress();
@@ -93,7 +101,19 @@ export function createApp({ contract, signers, store, key = deriveKey(), patient
         const tx = await contract.connect(req.actor).createRecord(recordId, patientId, dataHash, encryptedBlobHash);
         await tx.wait();
       } catch (error) {
-        throw new HttpError(502, `ledger transaction failed: ${error.shortMessage || error.message}`);
+        let cleanupNote = '';
+        try {
+          await parseRecord(contract, recordId);
+          cleanupNote = '; the ledger record exists or its state is uncertain, so ciphertext was retained';
+        } catch (stateError) {
+          if (stateError instanceof HttpError && stateError.status === 404) {
+            try { await store.delete(recordId); }
+            catch { cleanupNote = '; ciphertext cleanup failed and may require manual removal'; }
+          } else {
+            cleanupNote = '; ledger state could not be checked, so ciphertext was retained';
+          }
+        }
+        throw new HttpError(502, `ledger transaction failed: ${error.shortMessage || error.message}${cleanupNote}`);
       }
       res.status(201).json({ recordId, patientId, dataHash, encryptedBlobHash, storedOffChainEncrypted: true });
     } catch (error) { next(error); }
@@ -103,6 +123,7 @@ export function createApp({ contract, signers, store, key = deriveKey(), patient
     try {
       if (req.actorRole !== 'patient') throw new HttpError(403, 'only the patient demo identity can grant consent');
       const recordId = recordIdFrom(req.params.recordId);
+      await parseRecord(contract, recordId);
       const target = req.body?.grantee;
       if (!['doctor', 'insurer'].includes(target)) throw new HttpError(400, 'grantee must be doctor or insurer');
       const seconds = Number(req.body?.expiresInSeconds);
@@ -120,6 +141,7 @@ export function createApp({ contract, signers, store, key = deriveKey(), patient
     try {
       if (req.actorRole !== 'patient') throw new HttpError(403, 'only the patient demo identity can revoke consent');
       const recordId = recordIdFrom(req.params.recordId);
+      await parseRecord(contract, recordId);
       const target = req.params.grantee;
       if (!['doctor', 'insurer'].includes(target)) throw new HttpError(400, 'grantee must be doctor or insurer');
       const grantee = await signerByRole[target].getAddress();
@@ -132,26 +154,28 @@ export function createApp({ contract, signers, store, key = deriveKey(), patient
   app.get('/api/records/:recordId/verify', withActor, async (req, res, next) => {
     try {
       const recordId = recordIdFrom(req.params.recordId);
+      const onChain = await parseRecord(contract, recordId);
       if (!(await contract.hasAccess(recordId, req.actorAddress))) throw new HttpError(403, 'no active consent for this identity');
-      const { onChain, bundle } = await verifyStoredRecord({ contract, store, recordId, key });
-      const tx = await contract.connect(req.actor).recordAccess(recordId);
+      const { bundle } = await verifyStoredRecord({ contract, store, recordId, key, onChain });
+      const tx = await contract.connect(req.actor).reportAccess(recordId);
       const receipt = await tx.wait();
-      res.json({ recordId, integrity: 'verified', patientId: onChain.patientId, commitmentSalt: bundle.commitmentSalt, transactionHash: receipt.hash, dataReturned: false });
+      res.json({ recordId, integrity: 'verified', patientId: onChain.patientId, commitmentSalt: bundle.commitmentSalt, transactionHash: receipt.hash, dataReturned: false, auditSemantics: 'the API verified the blob before submitting this; the ledger event is a caller report, not independent proof of retrieval' });
     } catch (error) { next(error); }
   });
 
   app.get('/api/records/:recordId/access', withActor, async (req, res, next) => {
     try {
       const recordId = recordIdFrom(req.params.recordId);
+      const onChain = await parseRecord(contract, recordId);
       if (!(await contract.hasAccess(recordId, req.actorAddress))) throw new HttpError(403, 'no active consent for this identity');
-      const { payload, bundle, onChain } = await verifyStoredRecord({ contract, store, recordId, key });
-      const tx = await contract.connect(req.actor).recordAccess(recordId);
+      const { payload, bundle } = await verifyStoredRecord({ contract, store, recordId, key, onChain });
+      const tx = await contract.connect(req.actor).reportAccess(recordId);
       const receipt = await tx.wait();
-      res.json({ recordId, integrity: 'verified', payload, commitmentSalt: bundle.commitmentSalt, auditTransaction: receipt.hash, patientId: onChain.patientId });
+      res.json({ recordId, integrity: 'verified', payload, commitmentSalt: bundle.commitmentSalt, auditTransaction: receipt.hash, patientId: onChain.patientId, auditSemantics: 'the API verified the blob before submitting this; the ledger event is a caller report, not independent proof of retrieval' });
     } catch (error) { next(error); }
   });
 
-  app.get('/api/records/:recordId/audit', async (req, res, next) => {
+  app.get('/api/records/:recordId/audit', withActor, async (req, res, next) => {
     try {
       const recordId = recordIdFrom(req.params.recordId);
       await parseRecord(contract, recordId);
@@ -160,7 +184,7 @@ export function createApp({ contract, signers, store, key = deriveKey(), patient
         contract.queryFilter(contract.filters.RecordCreated(recordId), 0, latest),
         contract.queryFilter(contract.filters.AccessGranted(recordId), 0, latest),
         contract.queryFilter(contract.filters.AccessRevoked(recordId), 0, latest),
-        contract.queryFilter(contract.filters.RecordAccessed(recordId), 0, latest)
+        contract.queryFilter(contract.filters.AccessReported(recordId), 0, latest)
       ]);
       const events = [...created, ...granted, ...revoked, ...accessed].sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
       res.json({ recordId, events: events.map((event) => ({

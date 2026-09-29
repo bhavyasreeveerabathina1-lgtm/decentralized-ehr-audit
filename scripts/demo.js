@@ -9,7 +9,7 @@ import { EncryptedBlobStore } from '../src/store.js';
 const tempDir = await mkdtemp(path.join(os.tmpdir(), 'ehr-audit-demo-'));
 const system = await createSystem();
 const store = new EncryptedBlobStore(tempDir);
-const app = createApp({ ...system, store });
+const app = createApp({ ...system, store, demoAuthEnabled: true });
 const server = createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -30,7 +30,7 @@ try {
     patientRef: 'patient-demo-001',
     payload: { recordType: 'lab', date: '2026-09-29', provider: 'Example Clinic', diagnosisCode: 'LAB-A1', summary: 'Synthetic test result: within reference range.' }
   }) });
-  console.log(`   Created ${created.recordId}; only hashes and a pseudonymous ID are on-chain.`);
+  console.log(`   Created ${created.recordId}; the ledger exposes IDs, wallet addresses, consent/access metadata, and hashes, but not the record text.`);
 
   console.log('2. Confirm unauthorized access is denied...');
   const denied = await fetch(`${base}/api/records/${created.recordId}/access`, { headers: { 'x-demo-actor': 'doctor' } });
@@ -49,8 +49,8 @@ try {
   const afterRevoke = await fetch(`${base}/api/records/${created.recordId}/access`, { headers: { 'x-demo-actor': 'doctor' } });
   console.log(`   Doctor after revocation: HTTP ${afterRevoke.status} (expected 403).`);
 
-  const audit = await call(`/api/records/${created.recordId}/audit`);
-  console.log(`6. Audit trail contains ${audit.events.length} on-chain events: ${audit.events.map((event) => event.type).join(', ')}.`);
+  const audit = await call(`/api/records/${created.recordId}/audit`, 'patient');
+  console.log(`6. Audit trail contains ${audit.events.length} on-chain events: ${audit.events.map((event) => event.type).join(', ')}. AccessReported is a caller assertion; only this API flow checks the off-chain blob first.`);
   console.log('\nDemo completed. See docs/threat-model.md and docs/security-notes.md for limitations.');
 } finally {
   await new Promise((resolve) => server.close(resolve));

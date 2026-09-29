@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @notice Educational ledger: only commitments and pseudonymous identifiers belong on-chain.
+/// @notice Educational ledger: stores commitments and public, linkable identity/event metadata.
 /// @dev This contract is intentionally small and is not production- or clinical-ready.
 contract EHRAudit {
     struct Record {
@@ -18,7 +18,8 @@ contract EHRAudit {
     event RecordCreated(bytes32 indexed recordId, bytes32 indexed patientId, address indexed patient, bytes32 dataHash, bytes32 encryptedBlobHash);
     event AccessGranted(bytes32 indexed recordId, address indexed patient, address indexed grantee, uint64 expiresAt);
     event AccessRevoked(bytes32 indexed recordId, address indexed patient, address indexed grantee);
-    event RecordAccessed(bytes32 indexed recordId, address indexed actor, uint64 occurredAt);
+    /// @notice A caller assertion; the contract cannot verify retrieval or off-chain blob integrity.
+    event AccessReported(bytes32 indexed recordId, address indexed actor, uint64 occurredAt);
 
     modifier recordExists(bytes32 recordId) {
         require(records[recordId].exists, "unknown record");
@@ -27,6 +28,7 @@ contract EHRAudit {
 
     function createRecord(bytes32 recordId, bytes32 patientId, bytes32 dataHash, bytes32 encryptedBlobHash) external {
         require(recordId != bytes32(0) && patientId != bytes32(0), "empty identifier");
+        require(dataHash != bytes32(0) && encryptedBlobHash != bytes32(0), "empty commitment");
         require(!records[recordId].exists, "record already exists");
         records[recordId] = Record(msg.sender, patientId, dataHash, encryptedBlobHash, true);
         emit RecordCreated(recordId, patientId, msg.sender, dataHash, encryptedBlobHash);
@@ -52,13 +54,13 @@ contract EHRAudit {
         return actor == record.patient || accessUntil[recordId][actor] > block.timestamp;
     }
 
-    /// @notice Emit an immutable audit event after the application has checked consent and integrity.
-    function recordAccess(bytes32 recordId) external recordExists(recordId) {
+    /// @notice Report an access assertion; off-chain integrity checks are not verifiable by this contract.
+    function reportAccess(bytes32 recordId) external recordExists(recordId) {
         require(hasAccess(recordId, msg.sender), "access not granted");
-        emit RecordAccessed(recordId, msg.sender, uint64(block.timestamp));
+        emit AccessReported(recordId, msg.sender, uint64(block.timestamp));
     }
 
-    /// @notice Exposes only commitments and the patient wallet; encrypted content stays off-chain.
+    /// @notice Returns public metadata and commitments; addresses, IDs, and event history are linkable.
     function getRecord(bytes32 recordId) external view recordExists(recordId)
         returns (address patient, bytes32 patientId, bytes32 dataHash, bytes32 encryptedBlobHash)
     {

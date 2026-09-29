@@ -4,15 +4,17 @@
 
 ## Identity and access control are simulated
 
-The API accepts `x-demo-actor: patient|doctor|insurer` and chooses a local Hardhat test signer. Anyone who can reach the API can choose any of these labels. The patient does not hold or sign with an independent wallet; the backend is a custodian for every demo identity. The contract itself can be called directly by arbitrary local-chain accounts, so the app's role restrictions are not a network identity system.
+When explicitly enabled with `EHR_ENABLE_DEMO_AUTH=true`, the API accepts `x-demo-actor: patient|doctor|insurer` and chooses a local Hardhat test signer. The role routes are disabled by default, and the CLI refuses non-loopback binding; these are local-demo guardrails, not authentication. Anyone who can reach the enabled API can still choose any role. The patient does not hold or sign with an independent wallet; the backend is a custodian for every demo identity. The contract itself can be called directly by arbitrary local-chain accounts, so the app's role restrictions are not a network identity system.
 
 A real design would need strong identity proofing, institutional membership, authentication, patient-controlled transaction signing or a rigorously governed custody model, account recovery, least privilege, separation of duties, phishing defenses, and a security-tested authorization service.
 
 ## Encryption and key handling
 
-The demo uses AES-256-GCM with a random 96-bit IV per record and a 128-bit authentication tag. It derives different encryption and patient-pseudonym keys from `EHR_MASTER_KEY` using purpose labels. The fallback key is intentionally hard-coded and public. This is not acceptable key management. There is no HSM/KMS, rotation, backup, tenant separation, envelope-key wrapping, access-controlled key service, or emergency recovery. Losing/changing the secret makes stored data unreadable; leaking it exposes every record encrypted under it.
+The demo uses AES-256-GCM with a random 96-bit IV per record and a 128-bit authentication tag. It derives different encryption and patient-pseudonym keys from `EHR_MASTER_KEY` using purpose labels. A 32-byte random key encoded as exactly 64 hexadecimal characters is required; there is no source-defined fallback, and startup fails if it is missing or malformed. This requirement does not provide full key management: there is no HSM/KMS, rotation, backup, tenant separation, envelope-key wrapping, access-controlled key service, or emergency recovery. Losing/changing the secret makes stored data unreadable; leaking it exposes every record encrypted under it.
 
 Hashes provide tamper evidence only relative to the committed version. The salted plaintext commitment uses a random 32-byte value stored inside the encrypted bundle; an authorized response reveals it so a client with the matching record can recompute the commitment. The keyed patient pseudonym reduces offline guessing of a low-entropy alias by someone who sees only the chain, but is deterministic and correlatable. It does not anonymize a person. Contract hashes, addresses, and event timing also carry metadata risk.
+
+The contract emits `AccessReported` only as a caller assertion after checking on-chain ownership/consent. It cannot inspect the off-chain blob. The API verifies the envelope and plaintext commitments before it submits its own event, but a direct caller with access can submit the same event without those checks; do not interpret the event as independent proof of a verified read. The audit API exposes linkable contract events and scans the local chain's history; it is a teaching endpoint, not a rate-limited public service.
 
 ## Consent and revocation limits
 
