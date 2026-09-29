@@ -15,6 +15,8 @@ flowchart LR
 
 The API and local Hardhat test signers are trusted in this educational build. Role-header routes are disabled by default and require explicit demo opt-in; the CLI only binds to loopback. This remains a local safety boundary, not authentication: a real deployment would not treat a client-supplied role string as an identity proof.
 
+The ordinary API accepts fabricated data. Only the benchmark's loopback server explicitly opts into the public, de-identified MIMIC-IV demo source marker; it generates random per-run aliases, uses a temporary encrypted store, and does not persist source files or row-level outputs. This narrow research path is not a general real-patient-data mode; see the [benchmark method](benchmark-method.md).
+
 ## Data placement
 
 **On-chain:** record ID; patient wallet address; keyed pseudonymous patient ID; salted content commitment; encrypted-envelope hash; grantee and actor wallet addresses; consent expiry; transaction sender; event type; block/time metadata. Even these fields can reveal that a record exists and who interacted with it. Addresses and event timing are linkable, and ledger data cannot be deleted.

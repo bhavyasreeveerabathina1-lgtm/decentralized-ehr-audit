@@ -14,9 +14,12 @@ class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
-function validatePayload(body) {
+function validatePayload(body, allowMimicDemoData = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'JSON request body is required');
-  if (body.synthetic !== true) throw new HttpError(400, 'synthetic must be true; this prototype accepts synthetic data only');
+  const mimicDemoRecord = allowMimicDemoData && body.synthetic === false && body.source === 'mimic-demo';
+  const allowedBodyFields = new Set(mimicDemoRecord ? ['synthetic', 'source', 'patientRef', 'payload'] : ['synthetic', 'patientRef', 'payload']);
+  if (Object.keys(body).some((key) => !allowedBodyFields.has(key))) throw new HttpError(400, 'request contains unsupported fields');
+  if (body.synthetic !== true && !mimicDemoRecord) throw new HttpError(400, 'synthetic must be true; only the local benchmark may opt into MIMIC-IV demo rows');
   if (typeof body.patientRef !== 'string' || !/^[a-z0-9-]{3,48}$/i.test(body.patientRef)) throw new HttpError(400, 'patientRef must be a synthetic pseudonymous alias (3–48 letters, digits, or hyphens)');
   const payload = body.payload;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new HttpError(400, 'payload object is required');
@@ -57,7 +60,7 @@ async function verifyStoredRecord({ contract, store, recordId, key, onChain: kno
   return { onChain, bundle, payload: bundle.payload };
 }
 
-export function createApp({ contract, signers, store, key = deriveKey(), patientIdKey = deriveKey(undefined, 'patient-pseudonym-v1'), demoAuthEnabled = false }) {
+export function createApp({ contract, signers, store, key = deriveKey(), patientIdKey = deriveKey(undefined, 'patient-pseudonym-v1'), demoAuthEnabled = false, allowMimicDemoData = false }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '16kb', strict: true }));
@@ -89,7 +92,7 @@ export function createApp({ contract, signers, store, key = deriveKey(), patient
     let recordId;
     try {
       if (req.actorRole !== 'patient') throw new HttpError(403, 'only the patient demo identity can create a record');
-      const { patientRef, payload } = validatePayload(req.body);
+      const { patientRef, payload } = validatePayload(req.body, allowMimicDemoData);
       recordId = keccak256(toUtf8Bytes(`${randomBytes(32).toString('hex')}:${Date.now()}`));
       const patientId = patientPseudonym(patientRef, patientIdKey);
       const bundle = { payload, commitmentSalt: randomBytes(32).toString('hex') };

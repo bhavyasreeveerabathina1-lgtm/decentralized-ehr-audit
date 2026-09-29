@@ -2,7 +2,7 @@
 
 ## Scope and security objectives
 
-The demo aims to teach four properties: record content is not written directly to the ledger; a stored encrypted blob can be checked against a ledger commitment; a grantee without an active patient grant is denied by the API (the patient always has access); and grants, revocations, and caller-reported accesses create inspectable EVM events. The system assumes all values are synthetic and runs on one local computer.
+The demo aims to teach four properties: record content is not written directly to the ledger; a stored encrypted blob can be checked against a ledger commitment; a grantee without an active patient grant is denied by the API (the patient always has access); and grants, revocations, and caller-reported accesses create inspectable EVM events. It runs on one local computer. The regular demo uses fabricated values; a separate, explicit local benchmark mode can process the public de-identified MIMIC-IV demo under its license.
 
 ## Assets and trust boundaries
 
@@ -27,7 +27,7 @@ Assets include record plaintext before and after decryption, the AES key and pse
 
 - Test signers, the master secret, Node process, dependencies, and local machine are trusted for the duration of a demo.
 - Demo role headers are enabled only for a trusted local demonstrator; they are not suitable for untrusted callers.
-- The record sample values are fabricated. The `synthetic: true` flag does not validate provenance.
+- The ordinary demo values are fabricated. The benchmark-only MIMIC demo path is a narrow exception and is not for full MIMIC-IV, other datasets, or operational use. The `synthetic: true` flag does not validate provenance.
 - The embedded chain's state is intentionally disposable and does not model a permissioned production network.
 
 ## Out of scope

@@ -58,6 +58,31 @@ test('demo role selection is disabled unless explicitly enabled', async () => {
   }
 });
 
+test('MIMIC demo input is rejected by default and accepted only with the explicit benchmark opt-in', async () => {
+  const mimicRequest = {
+    synthetic: false,
+    source: 'mimic-demo',
+    patientRef: 'bench-test-001',
+    payload: { recordType: 'encounter', date: '2150-01-02', provider: 'Demo Hospital', diagnosisCode: 'TEST-1', summary: 'De-identified benchmark fixture.' }
+  };
+  const deniedByDefault = await call('/api/records', 'patient', { method: 'POST', body: JSON.stringify(mimicRequest) });
+  assert.equal(deniedByDefault.status, 400);
+
+  const localBenchmarkServer = createServer(createApp({ ...system, store, demoAuthEnabled: true, allowMimicDemoData: true }));
+  await new Promise((resolve) => localBenchmarkServer.listen(0, '127.0.0.1', resolve));
+  try {
+    const targetBase = `http://127.0.0.1:${localBenchmarkServer.address().port}`;
+    const accepted = await callAt(targetBase, '/api/records', 'patient', { method: 'POST', body: JSON.stringify(mimicRequest) });
+    assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
+    const unexpectedSource = await callAt(targetBase, '/api/records', 'patient', { method: 'POST', body: JSON.stringify({ ...syntheticRequest, source: 'mimic-demo' }) });
+    assert.equal(unexpectedSource.status, 400);
+    const unsupportedIdentifier = await callAt(targetBase, '/api/records', 'patient', { method: 'POST', body: JSON.stringify({ ...mimicRequest, subject_id: 'must-not-be-forwarded' }) });
+    assert.equal(unsupportedIdentifier.status, 400);
+  } finally {
+    await new Promise((resolve) => localBenchmarkServer.close(resolve));
+  }
+});
+
 test('contract rejects a missing plaintext or ciphertext commitment', async () => {
   const patientId = keccak256(toUtf8Bytes('patient-id'));
   const blobHash = keccak256(toUtf8Bytes('blob'));

@@ -1,44 +1,43 @@
-# Decentralized EHR Auditing System — Educational Prototype
+# Decentralized EHR Auditing — Cybersecurity Research Prototype
 
-This runnable prototype demonstrates a **consent-controlled audit trail** for synthetic healthcare records. It keeps encrypted record contents off-chain, but the contract and events expose record and pseudonymous IDs, patient/grantee/actor wallet addresses, consent/access timing, and cryptographic commitments. It emits access-report events; these are caller assertions, not independent proof that an off-chain blob was retrieved.
+This project studies a narrow system-security question: **on a local machine, what integrity, consent, latency, throughput, and storage behavior does a blockchain-backed EHR audit prototype show compared with the same application flow using an in-process metadata store?** It is an educational research artifact, not a clinical system, medical device, compliance certification, or production-ready EHR. It does not evaluate diagnosis, prediction, or clinical outcomes.
 
-**It is an educational prototype, not a clinical system, medical device, compliance certification, or production-ready EHR. Use synthetic data only.** Its simulated identities and API headers are intentionally not real authentication; role routes are disabled unless explicitly enabled for a local demo.
+The API and standard walkthrough accept fabricated data only. A separate benchmark can optionally process the public, de-identified [MIMIC-IV Clinical Database Demo, release 2.2](https://physionet.org/content/mimic-iv-demo/2.2/) locally, solely to exercise data-shaped records; it has an explicit opt-in not enabled by the normal server. The demo has 100 patients, excludes free-text notes, and is licensed under the **Open Data Commons Open Database License v1.0 (ODbL-1.0)**. No downloaded dataset or patient-level output belongs in this repository. See the [benchmark protocol and attribution](docs/benchmark-method.md).
 
-## What it demonstrates
+## Research and measured evidence
 
-- Solidity contract deployed to a fresh, local Hardhat Network EVM on application startup.
-- Synthetic record JSON encrypted with AES-256-GCM before it is written to a local blob store.
-- On-chain commitment to both the encrypted blob and salted plaintext bundle; keyed, deterministic patient pseudonyms reduce simple dictionary guessing, but remain linkable.
-- Patient-mediated, expiring doctor/insurer grants and revocation.
-- Retrieval allows the patient or an active grantee, verifies the encrypted blob hash, authenticates/decrypts the blob, verifies the plaintext commitment, then submits an `AccessReported` caller assertion.
-- Integration tests for consent denial, grant, integrity, tampering, revocation, and event history.
+The evaluation pairs the existing local Solidity contract/Hardhat workflow against a no-blockchain control that uses the same Express routes, AES-256-GCM encryption, temporary encrypted file store, consent checks, and integrity checks, but keeps record metadata and grants in an in-process map. For each record it measures consent denial before grant, grant, verification, authorized retrieval, ciphertext-tamper rejection, revocation, and denial after revocation. It reports latency distributions, serial records per second, encrypted file size, local EVM gas, and a documented estimate of storage bytes.
 
-The contract stores **no record text**, but EVM state and event metadata are public and linkable; pseudonymity is not anonymity. Read [the system design](docs/architecture.md), [threat model](docs/threat-model.md), and [security notes](docs/security-notes.md) before extending it.
+The benchmark prints and can save an aggregate-only JSON summary with deterministic bootstrap intervals for median operation latency. Its intervals describe variation in that one local run, not across machines or hospitals. The committed result at [`docs/results/mimic-iv-demo-2.2.json`](docs/results/mimic-iv-demo-2.2.json) records the actual environment and observations; reproduction details, methods, source/license attribution, and limitations are in [`docs/benchmark-method.md`](docs/benchmark-method.md). Metrics are local educational evidence, not clinical accuracy or production-cost estimates.
 
-## Requirements
+On the recorded 100-row run, both backends denied all 100 unauthorized reads, rejected all 100 tamper trials, and enforced all 100 revocations. End-to-end serial throughput was 2.320 records/s with the local EVM and 55.366 records/s with the in-process baseline; median create latency was 56.881 ms (95% bootstrap interval 51.539–60.976 ms) versus 2.771 ms (2.706–2.893 ms). This demonstrates the measured overhead of local contract transactions in this setup, not a general comparison with a production database or decentralized network.
 
-- Node.js 20 or later and npm.
-- No external node, wallet, database, or API account is needed; Hardhat Network starts automatically as a local child process.
+The project is framed as a cybersecurity and systems portfolio artifact because [NYU Tandon's official M.S. in Computer Science page](https://engineering.nyu.edu/academics/programs/computer-science-ms) lists cybersecurity among selectable areas of study. That curricular fit is not an admissions prediction or guarantee; applicants should present their own work and results accurately.
 
-## Install and run
+## Run the synthetic demo
+
+Requirements: Node.js 20+ and npm. No external node, wallet, database, or API account is needed for the synthetic demo; the Hardhat Network starts as a local child process.
 
 ```bash
-cd /workspace/decentralized-ehr-audit
-npm install
-export EHR_MASTER_KEY="$(openssl rand -hex 32)"
-export EHR_ENABLE_DEMO_AUTH=true
+npm ci
 npm test
 npm run compile
+export EHR_MASTER_KEY="$(openssl rand -hex 32)"
 npm run demo
+npm run benchmark -- --source synthetic --records 12
 ```
 
-`npm run demo` runs the complete patient → consent → doctor verify/retrieve → patient revoke → audit-trail scenario and exits. `npm start` starts the HTTP API at `http://127.0.0.1:3000`. Startup deploys a fresh contract to a **new in-memory chain**, so ledger state resets when the process exits. By default, encrypted blobs are placed in a temporary directory and removed at shutdown. To preserve ciphertext for inspection, set `EHR_STORE_DIR`; remember that the chain still resets on restart, so persistent blobs will no longer have matching ledger entries. The server refuses non-loopback `HOST` values.
+The demo starts a fresh, disposable Hardhat chain and a temporary encrypted file store, then removes the stored ciphertext on exit. The API's simulated role header is not authentication; the CLI refuses to bind beyond loopback. `npm start` additionally requires `EHR_MASTER_KEY` (64 hexadecimal characters) and `EHR_ENABLE_DEMO_AUTH=true`; `.env.example` documents settings but is not loaded automatically. Never commit a real `.env`, key material, or data.
 
-There is **no default master key**: `EHR_MASTER_KEY` must be set to exactly 64 hexadecimal characters generated from 32 random bytes. Keep it private and stable for the duration of a demo; changing keys makes existing ciphertext unreadable. `EHR_ENABLE_DEMO_AUTH=true` is also required to opt into the role-header demo API. `.env.example` documents the settings; this project does not load `.env` automatically.
+## Optional public MIMIC demo benchmark
 
-## Try the API
+The MIMIC-IV demo is public and PhysioNet's release page states that anyone may access its files subject to the license; the AWS registry says no AWS account is required. The exact import, run, and temporary cleanup commands are in the [benchmark guide](docs/benchmark-method.md). Full MIMIC-IV is separate and requires credentialed access, CITI training, and a signed data-use agreement; this project does not access it. If the public demo's access terms change, stop and follow the current publisher instructions rather than using anyone else's credentials.
 
-Start the server in one terminal:
+The benchmark uses the demo only on the local machine and deletes temporary encrypted stores on completion. It never emits row-level records, subject/admission identifiers, patient-mapped digests, or keys. It writes only an aggregate-only summary; inspect that JSON before publication and never commit the source ZIP, extracted CSVs, per-record logs, hashes, secrets, or local encrypted files. Following the registry's instruction, cite **MIMIC-IV Clinical Database Demo, accessed 2026-09-29 from the [AWS Open Data registry](https://registry.opendata.aws/mimic-iv-demo/)**; also link the [PhysioNet release](https://physionet.org/content/mimic-iv-demo/2.2/) and [dataset documentation DOI](https://doi.org/10.13026/dp1f-ex47).
+
+## API walkthrough (fabricated data only)
+
+Start the local API in one terminal:
 
 ```bash
 export EHR_MASTER_KEY="$(openssl rand -hex 32)"
@@ -46,9 +45,7 @@ export EHR_ENABLE_DEMO_AUTH=true
 npm start
 ```
 
-The API uses `x-demo-actor: patient|doctor|insurer` to choose one of three local demo signers. This header is **not authentication**; anyone who can reach the demo API can claim any role. Role routes and demo addresses are disabled by default. Explicitly enable them only for a local educational run with `EHR_ENABLE_DEMO_AUTH=true`; the server refuses non-loopback bindings and does not provide TLS or real identity verification.
-
-Create a record using entirely synthetic values:
+The `x-demo-actor: patient|doctor|insurer` header selects a local test signer; it is intentionally impersonable and is not authentication. Create a fabricated record:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:3000/api/records \
@@ -56,39 +53,29 @@ curl -sS -X POST http://127.0.0.1:3000/api/records \
   -d '{"synthetic":true,"patientRef":"patient-demo-001","payload":{"recordType":"lab","date":"2026-09-29","provider":"Example Clinic","diagnosisCode":"LAB-A1","summary":"Synthetic result within reference range."}}'
 ```
 
-Use the returned `recordId` in these examples:
+Use the returned record ID for consent, verification, retrieval, revocation, and audit:
 
 ```bash
-# Patient grants the doctor access for one hour
-curl -sS -X POST http://127.0.0.1:3000/api/records/$RECORD_ID/consent \
+curl -sS -X POST "http://127.0.0.1:3000/api/records/$RECORD_ID/consent" \
   -H 'content-type: application/json' -H 'x-demo-actor: patient' \
   -d '{"grantee":"doctor","expiresInSeconds":3600}'
-
-# Doctor verifies integrity without receiving the record text
-curl -sS http://127.0.0.1:3000/api/records/$RECORD_ID/verify -H 'x-demo-actor: doctor'
-
-# Authorized doctor retrieves the synthetic payload
-curl -sS http://127.0.0.1:3000/api/records/$RECORD_ID/access -H 'x-demo-actor: doctor'
-
-# Patient revokes access; later doctor reads return 403
-curl -sS -X POST http://127.0.0.1:3000/api/records/$RECORD_ID/revoke/doctor -H 'x-demo-actor: patient'
-
-# Inspect on-chain lifecycle and access-report events
-curl -sS http://127.0.0.1:3000/api/records/$RECORD_ID/audit -H 'x-demo-actor: patient'
+curl -sS "http://127.0.0.1:3000/api/records/$RECORD_ID/verify" -H 'x-demo-actor: doctor'
+curl -sS "http://127.0.0.1:3000/api/records/$RECORD_ID/access" -H 'x-demo-actor: doctor'
+curl -sS -X POST "http://127.0.0.1:3000/api/records/$RECORD_ID/revoke/doctor" -H 'x-demo-actor: patient'
+curl -sS "http://127.0.0.1:3000/api/records/$RECORD_ID/audit" -H 'x-demo-actor: patient'
 ```
 
-Other endpoints: `GET /health`, `GET /api/demo/accounts`. Payloads accept only the fields shown above, and `synthetic: true` is required. This is a guardrail, **not a way to detect whether supplied values are genuinely synthetic**.
+## Security and privacy boundaries
+
+Record contents remain off-chain, but ledger state and events expose record IDs, wallet addresses, pseudonymous identifiers, consent/access timing, and cryptographic commitments. Pseudonyms are linkable, not anonymous. `AccessReported` is a caller assertion; the contract cannot independently verify that an off-chain blob was fetched or checked. Read the [architecture](docs/architecture.md), [threat model](docs/threat-model.md), and [security notes](docs/security-notes.md) before extension.
+
+This prototype does not authenticate real patients or clinicians, protect plaintext after an authorized recipient copies it, establish medical truth, provide a durable consortium chain, or implement production key management, governance, interoperability, compliance, or incident response. Do not use it for clinical, coverage, reimbursement, or operational decisions.
 
 ## Repository map
 
-- `contracts/EHRAudit.sol` — Solidity state machine, consent checks, and events.
-- `src/api.js` — Express routes and authorization/integrity flow.
-- `src/crypto.js`, `src/store.js` — canonical hashes, AES-GCM, and encrypted local storage.
-- `src/system.js` — compiler/deployment against a local Hardhat Network node.
-- `scripts/demo.js` — complete runnable walkthrough.
-- `test/` — unit and integration tests.
-- `docs/` — report, architecture, threat model, and security caveats.
-
-## Scope and production boundary
-
-The use case is controlled sharing and independently inspectable audit evidence. A blockchain can make accepted events harder to alter later; it cannot establish that a submitted record is medically correct, prove who was physically using a device, or prevent an authorized recipient from copying plaintext. A real system needs substantial clinical, legal, privacy, identity, infrastructure, and security engineering that this prototype does not implement. See [Security notes](docs/security-notes.md).
+- `contracts/EHRAudit.sol` — Solidity consent state machine, commitments, and audit events.
+- `src/api.js`, `src/crypto.js`, `src/store.js` — API policy, encryption/hash checks, and encrypted local storage.
+- `src/system.js` — compile/deploy against a local Hardhat Network node.
+- `scripts/demo.js`, `scripts/benchmark.js` — synthetic walkthrough and aggregate-only comparison benchmark.
+- `test/` — cryptographic, API, data-import, and benchmark regression tests.
+- `docs/` — research method, aggregate result, architecture, report, threat model, and security notes.

@@ -1,6 +1,8 @@
 # Security, Privacy, and Production Boundaries
 
-**Do not use this project with real patient or insurance data. Do not use it to make clinical, coverage, reimbursement, or operational decisions.** It is a small, local educational prototype and is not a compliance assessment.
+**Do not use this project with PHI, identifiable patient or insurance data, or any operational record. Do not use it to make clinical, coverage, reimbursement, or operational decisions.** It is a small, local educational prototype and is not a compliance assessment.
+
+The regular demo API accepts fabricated data only. The optional benchmark has a separate, explicit opt-in for the openly published, de-identified 100-patient [MIMIC-IV Clinical Database Demo](https://physionet.org/content/mimic-iv-demo/2.2/) under its ODbL-1.0 terms. That exception exists only for a local reproducible measurement: source rows and generated ciphertext remain in temporary local processing/storage and are removed at exit; only aggregate metrics may be saved. It is not permission to use other datasets, full MIMIC-IV, or data you are not authorized to access. See [the benchmark protocol](benchmark-method.md) for source, attribution, and cleanup details.
 
 ## Identity and access control are simulated
 

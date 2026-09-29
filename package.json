@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node src/cli-server.js",
     "demo": "node scripts/demo.js",
+    "benchmark": "node scripts/benchmark.js",
     "test": "node --test",
     "compile": "node scripts/compile.js"
   },

@@ -1,0 +1,282 @@
+{
+  "schema_version": "1.0",
+  "recorded_at": "2026-09-29T09:21:33.695Z",
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "linux",
+    "architecture": "x64"
+  },
+  "source": {
+    "name": "MIMIC-IV Clinical Database Demo",
+    "release": "2.2",
+    "url": "https://physionet.org/content/mimic-iv-demo/2.2/",
+    "registry": "https://registry.opendata.aws/mimic-iv-demo/",
+    "license": "Open Data Commons Open Database License v1.0 (ODbL-1.0)",
+    "attribution": "MIMIC-IV Clinical Database Demo, accessed 2026-09-29 from https://registry.opendata.aws/mimic-iv-demo/; documentation DOI 10.13026/dp1f-ex47.",
+    "raw_data_included": false
+  },
+  "protocol": {
+    "records": 100,
+    "sequential_records": true,
+    "tamper_trials_per_record": 1,
+    "bootstrap_rounds": 1000,
+    "confidence_interval": "Deterministic nonparametric bootstrap 95% interval for the sample median; describes per-operation variation in this run only, not population or cross-deployment uncertainty."
+  },
+  "measurements": {
+    "local_evm": {
+      "phases": {
+        "create": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 56.36,
+          "p50": 56.881,
+          "p95": 63.56,
+          "bootstrap_95pct_ci_for_median": [
+            51.539,
+            60.976
+          ]
+        },
+        "deny_before_grant": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 26.098,
+          "p50": 25.881,
+          "p95": 27.974,
+          "bootstrap_95pct_ci_for_median": [
+            25.724,
+            26.047
+          ]
+        },
+        "grant": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 78.382,
+          "p50": 78.585,
+          "p95": 85.065,
+          "bootstrap_95pct_ci_for_median": [
+            74.125,
+            82.615
+          ]
+        },
+        "verify": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 74.093,
+          "p50": 73.437,
+          "p95": 76.112,
+          "bootstrap_95pct_ci_for_median": [
+            73.177,
+            73.788
+          ]
+        },
+        "access": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 67.52,
+          "p50": 66.98,
+          "p95": 74.263,
+          "bootstrap_95pct_ci_for_median": [
+            62.834,
+            71.714
+          ]
+        },
+        "tamper_detection": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 26.502,
+          "p50": 26.342,
+          "p95": 28.206,
+          "bootstrap_95pct_ci_for_median": [
+            26.169,
+            26.522
+          ]
+        },
+        "revoke": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 61.396,
+          "p50": 61.033,
+          "p95": 64.516,
+          "bootstrap_95pct_ci_for_median": [
+            60.769,
+            61.332
+          ]
+        },
+        "deny_after_revoke": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 26.066,
+          "p50": 26.079,
+          "p95": 27.401,
+          "bootstrap_95pct_ci_for_median": [
+            25.837,
+            26.25
+          ]
+        }
+      },
+      "gas": {
+        "create": {
+          "n": 100,
+          "mean": 137023,
+          "p50": 137028,
+          "p95": 137028
+        },
+        "grant": {
+          "n": 100,
+          "mean": 51666,
+          "p50": 51667,
+          "p95": 51667
+        },
+        "verify": {
+          "n": 100,
+          "mean": 30610,
+          "p50": 30611,
+          "p95": 30611
+        },
+        "access": {
+          "n": 100,
+          "mean": 30610,
+          "p50": 30611,
+          "p95": 30611
+        },
+        "revoke": {
+          "n": 100,
+          "mean": 29028,
+          "p50": 29029,
+          "p95": 29029
+        }
+      },
+      "encrypted_blob_bytes": {
+        "n": 100,
+        "mean": 712.7,
+        "p95": 747,
+        "unit": "bytes"
+      },
+      "pipeline_records_per_second": 2.32,
+      "behavior": {
+        "consent_grants_succeeded": 100,
+        "pre_grant_denials": 100,
+        "integrity_tampering_detected": 100,
+        "revocations_succeeded": 100,
+        "post_revocation_denials": 100
+      },
+      "estimated_evm_record_state_bytes_per_record": 160,
+      "estimated_evm_active_grant_storage_bytes_per_record": 32,
+      "evm_state_estimate_note": "Five 32-byte storage slots for the record struct (patient address, patient ID, data hash, encrypted-blob hash, and exists flag); one additional 32-byte mapping slot while a consent grant is active. Excludes trie, block, and event-log overhead."
+    },
+    "no_blockchain_baseline": {
+      "phases": {
+        "create": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 2.899,
+          "p50": 2.771,
+          "p95": 3.334,
+          "bootstrap_95pct_ci_for_median": [
+            2.706,
+            2.893
+          ]
+        },
+        "deny_before_grant": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 1.804,
+          "p50": 1.742,
+          "p95": 2.172,
+          "bootstrap_95pct_ci_for_median": [
+            1.67,
+            1.826
+          ]
+        },
+        "grant": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 1.953,
+          "p50": 1.949,
+          "p95": 2.329,
+          "bootstrap_95pct_ci_for_median": [
+            1.886,
+            2.047
+          ]
+        },
+        "verify": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 2.469,
+          "p50": 2.375,
+          "p95": 2.893,
+          "bootstrap_95pct_ci_for_median": [
+            2.347,
+            2.457
+          ]
+        },
+        "access": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 2.392,
+          "p50": 2.374,
+          "p95": 2.812,
+          "bootstrap_95pct_ci_for_median": [
+            2.329,
+            2.469
+          ]
+        },
+        "tamper_detection": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 2.19,
+          "p50": 2.154,
+          "p95": 2.621,
+          "bootstrap_95pct_ci_for_median": [
+            2.097,
+            2.23
+          ]
+        },
+        "revoke": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 1.827,
+          "p50": 1.755,
+          "p95": 2.187,
+          "bootstrap_95pct_ci_for_median": [
+            1.692,
+            1.814
+          ]
+        },
+        "deny_after_revoke": {
+          "n": 100,
+          "unit": "ms",
+          "mean": 1.651,
+          "p50": 1.681,
+          "p95": 2.203,
+          "bootstrap_95pct_ci_for_median": [
+            1.64,
+            1.792
+          ]
+        }
+      },
+      "encrypted_blob_bytes": {
+        "n": 100,
+        "mean": 712.7,
+        "p95": 747,
+        "unit": "bytes"
+      },
+      "pipeline_records_per_second": 55.366,
+      "behavior": {
+        "consent_grants_succeeded": 100,
+        "pre_grant_denials": 100,
+        "integrity_tampering_detected": 100,
+        "revocations_succeeded": 100,
+        "post_revocation_denials": 100
+      },
+      "in_memory_metadata_json_bytes_per_record_estimate": 380,
+      "baseline_note": "Same Express routes, payloads, AES-GCM encryption, local encrypted file store, consent checks, and integrity checks; grant state is an in-process map and has no signatures, consensus, or chain transaction."
+    }
+  },
+  "interpretation": {
+    "clinical_prediction_evaluated": false,
+    "decentralized_consensus_evaluated": false,
+    "dollar_costs": "Not measured: the chain is a local Hardhat EVM with no network fees.",
+    "confidence_scope": "CIs quantify only the observed per-operation sample variability in this one serial run; repeat runs on matched hardware are needed for deployment-level comparisons."
+  }
+}
